@@ -1,3 +1,5 @@
+using GraphQL.Language;
+
 namespace GraphQL.Types
 {
     public class FloatGraphType : ScalarGraphType
@@ -7,7 +9,7 @@ namespace GraphQL.Types
             Name = "Float";
         }
 
-        public override object Coerce(object value)
+        public override object ParseValue(object value)
         {
             float result;
             if (float.TryParse(value.ToString(), out result))
@@ -15,6 +17,12 @@ namespace GraphQL.Types
                 return result;
             }
             return null;
+        }
+
+        public override object ParseLiteral(IValue value)
+        {
+            var floatVal = value as FloatValue;
+            return floatVal?.Value;
         }
     }
 }
