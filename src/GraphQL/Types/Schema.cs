@@ -26,6 +26,7 @@ namespace GraphQL.Types
     public class Schema : ISchema
     {
         private readonly Lazy<GraphTypesLookup> _lookup;
+        private readonly List<Type> _additionalTypes;
 
         public Schema()
             : this(type => (GraphType) Activator.CreateInstance(type))
@@ -37,6 +38,7 @@ namespace GraphQL.Types
             ResolveType = resolveType;
 
             _lookup = new Lazy<GraphTypesLookup>(CreateTypesLookup);
+            _additionalTypes = new List<Type>();
         }
 
         public ObjectGraphType Query { get; set; }
@@ -67,6 +69,36 @@ namespace GraphQL.Types
                     .Where(x => !(x is NonNullGraphType || x is ListGraphType))
                     .ToList();
             }
+        }
+
+        public IEnumerable<Type> AdditionalTypes
+        {
+            get { return _additionalTypes; }
+            set
+            {
+                _additionalTypes.Clear();
+                RegisterTypes(value);
+            }
+        }
+
+        public void RegisterTypes(IEnumerable<Type> types)
+        {
+            types.Apply(RegisterType);
+        }
+
+        public void RegisterType<T>() where T : GraphType
+        {
+            RegisterType(typeof(T));
+        }
+
+        public void RegisterType(Type type)
+        {
+            if (!typeof (GraphType).IsAssignableFrom(type))
+            {
+                throw new ArgumentOutOfRangeException(nameof(type), "Type must be of GraphType.");
+            }
+
+            _additionalTypes.Fill(type);
         }
 
         public GraphType FindType(string name)
@@ -100,7 +132,18 @@ namespace GraphQL.Types
 
         private GraphTypesLookup CreateTypesLookup()
         {
-            return GraphTypesLookup.Create(new[] { Query, Mutation }, ResolveType);
+            var resolvedTypes = _additionalTypes.Select(ResolveType).ToList();
+
+            var types = new List<GraphType>
+            {
+                Query,
+                Mutation
+            }
+            .Concat(resolvedTypes)
+            .Where(x => x != null)
+            .ToList();
+
+            return GraphTypesLookup.Create(types, ResolveType);
         }
 
         private GraphType AddType(Type type)
